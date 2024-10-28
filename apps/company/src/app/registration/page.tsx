@@ -4,11 +4,27 @@ import { TitleTemplate } from "@/components/titleTemplate";
 import { SubTitleTemplate } from "@/components/subTitleTemplate";
 import * as S from "./style";
 import { InputTemplate } from "@/components/inputTemplate";
-import { Input, Icon, Text, Flex, Button, useToast, Textarea } from "@jobis/ui";
+import {
+  Input,
+  Icon,
+  Text,
+  Flex,
+  Button,
+  useToast,
+  Textarea,
+  Checkbox,
+} from "@jobis/ui";
 import { themes } from "@jobis/design-token";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import { ICompanyRegisterRequest } from "@/apis/company/types";
-import { RefObject, useCallback, useEffect, useRef, useState } from "react";
+import {
+  RefObject,
+  TextareaHTMLAttributes,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useModal } from "@/hooks/useModal";
 import { Address } from "react-daum-postcode";
 import DaumPostcode from "react-daum-postcode";
@@ -26,6 +42,7 @@ import {
 } from "@/hooks/apis/useCompanyApi";
 import { useGetCode } from "@/hooks/apis/useCodeApi";
 import { AxiosError } from "axios";
+import { Background } from "@/components/modal/style";
 
 export default function Registration() {
   const searchParams = useSearchParams();
@@ -46,7 +63,6 @@ export default function Registration() {
       main_address_detail: myCompanyInfo?.main_address_detail || "",
       sub_address_detail: myCompanyInfo?.sub_address_detail,
       business_number: regex.buisness_number(myCompanyInfo?.biz_no || ""),
-      biz_registration_url: myCompanyInfo?.biz_registration_url || "",
       business_area_code:
         businessCodes?.codes.find(
           code => code.keyword === myCompanyInfo?.business_area
@@ -70,17 +86,14 @@ export default function Registration() {
       manager_phone_no: regex.phone_number(
         myCompanyInfo?.manager_phone_no || ""
       ),
-      sub_manager_name: myCompanyInfo?.sub_manager_name,
-      sub_manager_phone_no:
-        regex.phone_number(myCompanyInfo?.sub_manager_phone_no || "") ||
-        undefined,
-      fax: regex.phone_number(myCompanyInfo?.fax || "") || undefined,
       company_profile_url: myCompanyInfo?.company_logo_url,
+      headquarter: myCompanyInfo?.headquarter || false,
     },
   });
   const { toast } = useToast();
 
   const [companyLogoPreview, setCompanyLogoPreview] = useState("");
+  const [charCount, setCharCount] = useState(0);
   const [companyId, setCompanyId] = useState(0);
   const [previewFiles, setPreviewFiles] = useState<{
     bizRegistrationFile: File[];
@@ -104,6 +117,19 @@ export default function Registration() {
         }
         return;
       }
+
+      const validNamePattern = /^[a-zA-Z0-9.]+$/;
+      const fileName = files[0].name;
+      if (!validNamePattern.test(fileName)) {
+        toast({
+          payload: {
+            type: "error",
+            message: "파일 이름은 영어와 숫자로만 구성되어야 합니다.",
+          },
+        });
+        return;
+      }
+
       const response = await fileUpload(Array.from(files)).catch(
         (err: AxiosError<AxiosError>) => {
           if (err.response?.data.message === "Invalid Extension File") {
@@ -175,8 +201,6 @@ export default function Registration() {
   const onSubmit: SubmitHandler<ICompanyRegisterRequest> = data => {
     const {
       representative_phone_no,
-      sub_manager_phone_no,
-      sub_manager_name,
       manager_phone_no,
       sub_address_detail,
       sub_zip_code,
@@ -184,7 +208,6 @@ export default function Registration() {
       worker_number,
       business_area_code,
       business_number,
-      fax,
     } = data;
 
     const requests = {
@@ -192,16 +215,12 @@ export default function Registration() {
       manager_phone_no: manager_phone_no?.replaceAll("-", ""),
       sub_zip_code: sub_zip_code || undefined,
       sub_address_detail: sub_address_detail || undefined,
-      sub_manager_name: sub_manager_name || undefined,
-      sub_manager_phone_no:
-        sub_manager_phone_no?.replaceAll("-", "") || undefined,
       take: +take.toString().replaceAll(",", ""),
       worker_number: +worker_number,
       business_area_code:
         businessCodes?.codes.find(
           code => code.keyword === business_area_code.toString()
         )?.code || 0,
-      fax: fax?.replaceAll("-", "") || undefined,
     };
 
     searchParams.get("type") === "edit"
@@ -233,6 +252,19 @@ export default function Registration() {
     e.preventDefault();
     e.returnValue = ""; //Chrome에서 동작하도록; deprecated
   };
+
+  const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setValue("headquarter", event.target.checked, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  useEffect(() => {
+    if (myCompanyInfo?.company_introduce) {
+      setCharCount(myCompanyInfo.company_introduce.length);
+    }
+  }, [myCompanyInfo]);
 
   useEffect(() => {
     (() => {
@@ -439,37 +471,14 @@ export default function Registration() {
                 })}
                 errorMessage={errors.main_address_detail?.message}
               />
-            </Flex>
-          </InputTemplate>,
-          <InputTemplate key="sub-address" title="주소(지점)">
-            <Flex direction="column" gap={8}>
-              <Flex gap={8}>
-                <Input
-                  width={367}
-                  disabled
-                  {...register("sub_address")}
-                  errorMessage={errors.sub_address?.message}
+              <Flex align="center">
+                <Checkbox
+                  key="head_office"
+                  onChange={handleCheckboxChange}
+                  checked={getValues("headquarter")}
                 />
-                <Input
-                  width={111}
-                  disabled
-                  {...register("sub_zip_code")}
-                  errorMessage={errors.sub_zip_code?.message}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => openModal("SUB_ADDRESS")}
-                >
-                  검색
-                </Button>
+                <p>본사</p>
               </Flex>
-              <Input
-                width={604}
-                placeholder="상세주소 입력"
-                {...register("sub_address_detail")}
-                errorMessage={errors.sub_address_detail?.message}
-              />
             </Flex>
           </InputTemplate>,
           <InputTemplate key="take" title="매출액(년)" required>
@@ -511,9 +520,16 @@ export default function Registration() {
                   width={604}
                   placeholder="직접입력"
                   errorMessage={errors.worker_number?.message}
-                  onChange={e =>
-                    field.onChange(e.target.value.replaceAll(/[^0-9]/g, ""))
-                  }
+                  onChange={e => {
+                    const value = e.target.value.replaceAll(/[^0-9]/g, "");
+                    let numericValue = Number.parseInt(value, 10);
+                    if (numericValue > 32_767) {
+                      numericValue = 32_767;
+                    } else if (numericValue < 0) {
+                      numericValue = 0;
+                    }
+                    field.onChange(numericValue);
+                  }}
                   icon={
                     <Text
                       fontSize="body2"
@@ -534,6 +550,17 @@ export default function Registration() {
                 {...register("business_area_code", {
                   required: "필수 선택 항목입니다.",
                 })}
+                onMouseDown={e => {
+                  if (searchParams.get("type") === "edit") {
+                    e.preventDefault();
+                  }
+                }}
+                style={{
+                  cursor:
+                    searchParams.get("type") === "edit"
+                      ? "not-allowed"
+                      : "pointer",
+                }}
               >
                 <S.Option value="" disabled selected>
                   선택 안함
@@ -556,79 +583,44 @@ export default function Registration() {
       <SubTitleTemplate
         title="담당자"
         components={[
-          <InputTemplate key="manager-name" title="담당자명(1)" required>
-            <Input
-              width={604}
-              placeholder="직접입력"
-              {...register("manager_name", {
-                required: "필수 입력 항목입니다.",
-              })}
-              errorMessage={errors.manager_name?.message}
-            />
-          </InputTemplate>,
-          <InputTemplate
-            key="manager-phone-no"
-            title="담장자 전화번호(1)"
-            required
-          >
-            <Controller
-              control={control}
-              name="manager_phone_no"
-              rules={{
-                required: "필수 입력 항목입니다.",
-                pattern: {
-                  value: /^\d{2,3}-\d{3,4}-\d{4}$/,
-                  message: "유효한 전화번호 형식이 아닙니다.",
-                },
-              }}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  type="tel"
-                  width={604}
-                  placeholder="nnn-nnnn-nnnn"
-                  maxLength={13}
-                  onChange={e =>
-                    field.onChange(regex.phone_number(e.target.value))
-                  }
-                  errorMessage={errors.manager_phone_no?.message}
-                />
-              )}
-            />
-          </InputTemplate>,
-          <InputTemplate key="sub-manager-name" title="담당자명(2)">
-            <Input
-              width={604}
-              placeholder="직접입력"
-              {...register("sub_manager_name")}
-              errorMessage={errors.sub_manager_name?.message}
-            />
-          </InputTemplate>,
-          <InputTemplate key="sub-manager-phone-no" title="담장자 전화번호(2)">
-            <Controller
-              control={control}
-              name="sub_manager_phone_no"
-              rules={{
-                pattern: {
-                  value: /^\d{2,3}-\d{3,4}-\d{4}$/,
-                  message: "유효한 전화번호 형식이 아닙니다.",
-                },
-              }}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  type="tel"
-                  width={604}
-                  placeholder="nnn-nnnn-nnnn"
-                  maxLength={13}
-                  onChange={e =>
-                    field.onChange(regex.phone_number(e.target.value))
-                  }
-                  errorMessage={errors.sub_manager_phone_no?.message}
-                />
-              )}
-            />
-          </InputTemplate>,
+          <Flex gap={10}>
+            <InputTemplate key="manager-name" title="담당자명" required>
+              <Input
+                width={223}
+                placeholder="직접입력"
+                {...register("manager_name", {
+                  required: "필수 입력 항목입니다.",
+                })}
+                errorMessage={errors.manager_name?.message}
+              />
+            </InputTemplate>
+            <InputTemplate key="manager-phone-no" title="전화번호" required>
+              <Controller
+                control={control}
+                name="manager_phone_no"
+                rules={{
+                  required: "필수 입력 항목입니다.",
+                  pattern: {
+                    value: /^\d{2,3}-\d{3,4}-\d{4}$/,
+                    message: "유효한 전화번호 형식이 아닙니다.",
+                  },
+                }}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    type="tel"
+                    width={223}
+                    placeholder="nnn-nnnn-nnnn"
+                    maxLength={13}
+                    onChange={e =>
+                      field.onChange(regex.phone_number(e.target.value))
+                    }
+                    errorMessage={errors.manager_phone_no?.message}
+                  />
+                )}
+              />
+            </InputTemplate>
+          </Flex>,
           <InputTemplate key="email" title="이메일" required>
             <Controller
               control={control}
@@ -650,30 +642,6 @@ export default function Registration() {
               )}
             />
           </InputTemplate>,
-          <InputTemplate key="fax" title="팩스번호">
-            <Controller
-              control={control}
-              name="fax"
-              rules={{
-                pattern: {
-                  value: /^\d{2,3}-\d{3,4}-\d{4}$/,
-                  message: "유효한 팩스번호 형식이 아닙니다.",
-                },
-              }}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  width={604}
-                  maxLength={13}
-                  placeholder="nnn-nnn-nnnn"
-                  onChange={e =>
-                    field.onChange(regex.phone_number(e.target.value))
-                  }
-                  errorMessage={errors.fax?.message}
-                />
-              )}
-            />
-          </InputTemplate>,
         ]}
       />
       <SubTitleTemplate
@@ -691,14 +659,35 @@ export default function Registration() {
             />
           </InputTemplate>,
           <InputTemplate key="company-introduce" title="회사개요" required>
-            <Textarea
-              width={604}
-              placeholder="직접입력"
-              {...register("company_introduce", {
-                required: "필수 입력 항목입니다.",
-              })}
-              errorMessage={errors.company_introduce?.message}
-            />
+            <div style={{ position: "relative", width: "604px" }}>
+              <Textarea
+                width={604}
+                placeholder="직접입력"
+                {...register("company_introduce", {
+                  required: "필수 입력 항목입니다.",
+                  maxLength: {
+                    value: 1000,
+                    message: "최대 1000자까지 입력 가능합니다.",
+                  },
+                  onChange: e => {
+                    setCharCount(e.target.value.length);
+                  },
+                })}
+                maxLength={1000}
+                errorMessage={errors.company_introduce?.message}
+              />
+              <div
+                style={{ position: "absolute", bottom: "12px", right: "12px" }}
+              >
+                <Text
+                  fontSize="body2"
+                  color={themes.Color.grayScale[60]}
+                  fontWeight="regular"
+                >
+                  {charCount}/1000
+                </Text>
+              </div>
+            </div>
           </InputTemplate>,
           <InputTemplate key="logo" title="회사로고">
             {companyLogoPreview ? (
@@ -723,9 +712,21 @@ export default function Registration() {
               onChange={uploadImgFile}
             />
           </InputTemplate>,
-          <InputTemplate key="biz-registration" title="사업자등록증" required>
+          <InputTemplate key="biz-registration" title="사업자등록증">
             <Flex direction="column">
-              <S.AddFileButton onClick={() => onUploadFile(bizRegistrationRef)}>
+              <S.AddFileButton
+                onClick={() => {
+                  if (searchParams.get("type") !== "edit") {
+                    onUploadFile(bizRegistrationRef);
+                  }
+                }}
+                style={{
+                  cursor:
+                    searchParams.get("type") === "edit"
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+              >
                 <Text fontSize="body2" fontWeight="regular">
                   파일 추가하기
                 </Text>
@@ -763,13 +764,6 @@ export default function Registration() {
                       size={16}
                       color={themes.Color.grayScale[70]}
                       cursor="pointer"
-                      onClick={() => {
-                        setValue("biz_registration_url", "");
-                        setPreviewFiles(prev => ({
-                          ...prev,
-                          bizRegistrationFile: [],
-                        }));
-                      }}
                     />
                   </S.FileWrapper>
                 ))}

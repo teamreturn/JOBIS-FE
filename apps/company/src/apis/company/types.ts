@@ -13,10 +13,7 @@ export interface IUpdateCompanyInfoRequest {
   company_introduce: string;
   email: string;
   manager_name: string;
-  sub_manager_name?: string;
   manager_phone_no: string;
-  sub_manager_phone_no?: string;
-  fax?: string;
   company_profile_url?: string;
   service_name: string;
   business_area_code: number | string;
@@ -26,10 +23,10 @@ export interface ICompanyRegisterRequest extends IUpdateCompanyInfoRequest {
   main_address_detail: string;
   sub_address_detail?: string;
   business_number: string;
-  biz_registration_url: string;
-  business_area_code: number | string;
   service_name: string;
   attachment_urls?: string[] | null;
+  biz_registration_url?: string;
+  headquarter?: boolean;
 }
 
 export interface ICheckBuisnessNumberResponse {
@@ -65,4 +62,5 @@ export interface IMyCompanyResponse {
   business_area: string;
   biz_registration_url: string;
   attachment_urls: string[];
+  headquarter: boolean;
 }
